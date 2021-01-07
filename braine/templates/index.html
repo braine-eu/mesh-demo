@@ -14,7 +14,29 @@
 <body>
 
 <div class="container">
-    <h2>Collect data points</h2>
+    {% if error %}<div class="alert alert-danger"><strong>Error:</strong> {{ error }}</div>{% endif %}
+    <h2>Settings</h2>
+    <form class="form-horizontal" action="/" method="post">
+      <div class="form-group">
+        <label class="control-label col-sm-2" for="collectURL">Collect service URL</label>
+        <div class="col-sm-4">
+            <input type="text" class="form-control" id="collectURL" name="collectUrl" value="{{ session.get('collectUrl') }}">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="control-label col-sm-2" for="plotURL">Plot service URL</label>
+        <div class="col-sm-4">
+            <input type="text" class="form-control" id="plotURL" name="plotUrl" value="{{ session.get('plotUrl') }}">
+        </div>
+      </div>
+      <div class="form-group">
+          <div class="col-sm-offset-2 col-sm-4">
+              <button type="submit" class="btn btn-primary">Apply</button>
+          </div>
+      </div>
+    </form>
+
+    <h2>Collect service</h2>
     <form class="form-horizontal" action="/collect">
       <div class="form-group">
         <label class="control-label col-sm-2" for="dataCount">Count</label>
@@ -30,11 +52,12 @@
     </form>
     {% if data %}
         <div class="panel panel-default">
+            <div class="panel-heading">Data points</div>
             <div class="panel-body">{{ data }}</div>
         </div>
     {% endif %}
 
-    <h2>Plot data points</h2>
+    <h2>Plot service</h2>
     <form class="form-horizontal" method="post" action="/plot">
       <div class="form-group">
           <div class="col-sm-offset-2 col-sm-4">
