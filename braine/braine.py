@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 from flask import Flask, request, jsonify, render_template, redirect, session, url_for
 import base64
 import urllib.request
@@ -59,4 +59,4 @@ def logout():
     return redirect(url_for('braine'))
 
 if __name__ == '__main__':
-    app.run(host='localhost', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=False)

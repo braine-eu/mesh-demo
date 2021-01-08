@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 from flask import Flask, request, jsonify
 import random
 
@@ -12,4 +12,4 @@ def collect():
     return jsonify([x,y])
 
 if __name__ == '__main__':
-    app.run(host='localhost', port=5002, debug=False)
+    app.run(host='0.0.0.0', port=5002, debug=False)
