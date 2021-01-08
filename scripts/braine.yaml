@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: braine
+  labels:
+    app: braine
+spec:
+  type: NodePort
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 5000
+  selector:
+    app: braine
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: braine
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: braine
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: braine
+        version: v1
+    spec:
+      containers:
+      - image: braine-docker-local.artifactory.eng.vmware.com/braine
+        imagePullPolicy: IfNotPresent
+        name: braine
+        ports:
+        - containerPort: 5000

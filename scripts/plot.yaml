@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: plot
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: plot
+  labels:
+    app: plot
+spec:
+  ports:
+  - name: http
+    port: 80
+    targetPort: 5001
+  selector:
+    app: plot
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: plot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: plot
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: plot
+        version: v1
+    spec:
+      serviceAccountName: plot
+      containers:
+      - image: braine-docker-local.artifactory.eng.vmware.com/plot
+        imagePullPolicy: IfNotPresent
+        name: plot
+        ports:
+        - containerPort: 5001
