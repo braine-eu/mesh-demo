@@ -1,5 +1,5 @@
 #!/bin/bash
-export INGRESS_HOST=$(kubectl --context $CTX_CLUSTER2 get po -l istio=ingressgateway -n istio-system -o jsonpath='{.items[0].status.hostIP}')
+export INGRESS_HOST=$(kubectl --context=$CTX_CLUSTER2 get po -l istio=ingressgateway -n istio-system -o jsonpath='{.items[0].status.hostIP}')
 export INGRESS_PORT=$(kubectl --context=$CTX_CLUSTER2 get svc -n istio-system istio-ingressgateway -o=jsonpath='{.spec.ports[?(@.port==15443)].nodePort}')
 
 echo "Ingress host for $CTX_CLUSTER2: $INGRESS_HOST"
