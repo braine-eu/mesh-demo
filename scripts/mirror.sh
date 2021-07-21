@@ -23,4 +23,13 @@ for version in $VERSIONS; do
   docker rmi $DEST_HUB/$name
 done
 done
+
+# one off for istio-coredns
+name="coredns-plugin:0.2-istio-1.1"
+docker pull $SOURCE_HUB/$name
+docker tag $SOURCE_HUB/$name $DEST_HUB/$name
+docker push $DEST_HUB/$name
+docker rmi $SOURCE_HUB/$name
+docker rmi $DEST_HUB/$name
+
 echo "Done."
