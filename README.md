@@ -9,7 +9,11 @@ export CTX_CLUSTER2=cluster2
 Install Istio 1.7.4
 ===
 ```
+kubectl --context cluster1 create namespace istio-system
+kubectl --context cluster1 create secret generic cacerts -n istio-system --from-file=samples/certs/ca-cert.pem --from-file=samples/certs/ca-key.pem --from-file=samples/certs/root-cert.pem --from-file=samples/certs/cert-chain.pem
 istioctl install --context $CTX_CLUSTER1 --set hub=braine-docker-local.artifactory.eng.vmware.com -f manifests/examples/multicluster/values-istio-multicluster-gateways.yaml
+kubectl --context cluster2 create namespace istio-system
+kubectl --context cluster2 create secret generic cacerts -n istio-system --from-file=samples/certs/ca-cert.pem --from-file=samples/certs/ca-key.pem --from-file=samples/certs/root-cert.pem --from-file=samples/certs/cert-chain.pem
 istioctl install --context $CTX_CLUSTER2 --set hub=braine-docker-local.artifactory.eng.vmware.com -f manifests/examples/multicluster/values-istio-multicluster-gateways.yaml
 ```
 
@@ -18,8 +22,8 @@ Install coredns-plugin
 There is no way to specify hub for coredns-plugin during install and it defaults to docker.io which has pull limits.
 The workaround is to pre-install the image on worker nodes:
 ```
-worker# docker pull braine-docker-local.artifactory.eng.vmware.com/coredns-plugin:0.2-istio-1.1
-worker# docker tag braine-docker-local.artifactory.eng.vmware.com/coredns-plugin:0.2-istio-1.1 istio/coredns-plugin:0.2-istio-1.1
+docker pull braine-docker-local.artifactory.eng.vmware.com/coredns-plugin:0.2-istio-1.1
+docker tag braine-docker-local.artifactory.eng.vmware.com/coredns-plugin:0.2-istio-1.1 istio/coredns-plugin:0.2-istio-1.1
 ```
 
 Restart services on master node
