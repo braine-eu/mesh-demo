@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net/http"
 	"strconv"
 
@@ -16,6 +17,7 @@ import (
 	"istio.io/client-go/pkg/apis/networking/v1beta1"
 	versionedclient "istio.io/client-go/pkg/clientset/versioned"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -77,7 +79,6 @@ func returnAllEMDCs(w http.ResponseWriter, r *http.Request) {
 }
 
 func createNewEMDC(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("File Upload Endpoint Hit")
 	// Parse our multipart form, 10 << 20 specifies a maximum
 	// upload of 10 MB files.
 	r.ParseMultipartForm(10 << 20)
@@ -93,7 +94,7 @@ func createNewEMDC(w http.ResponseWriter, r *http.Request) {
 
 	// Create a temporary file within our temp-images directory that follows
 	// a particular naming pattern
-	tempFile, err := ioutil.TempFile("/tmp", "upload-*.png")
+	tempFile, err := ioutil.TempFile("/tmp", "upload-*.yml")
 	if err != nil {
 		fmt.Println(err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -171,7 +172,14 @@ func returnAllServiceEntries(w http.ResponseWriter, r *http.Request) {
 	seList, err := ic.NetworkingV1beta1().ServiceEntries("").List(context.TODO(), metav1.ListOptions{})
 	ret := make([]ServiceEntry, 0, len(seList.Items))
 	for _, se := range seList.Items {
-		ret = append(ret, ServiceEntry{UUID: string(se.UID), Host: se.Spec.Hosts[0], Namespace: se.Namespace})
+		ret = append(ret, ServiceEntry{
+			UUID:       string(se.UID),
+			Host:       se.Spec.Hosts[0],
+			Namespace:  se.Namespace,
+			Name:       se.Name,
+			PortNumber: se.Spec.Ports[0].Number,
+			Protocol:   se.Spec.Ports[0].Protocol,
+		})
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(ret)
@@ -187,25 +195,56 @@ func createNewServiceEntry(w http.ResponseWriter, r *http.Request) {
 	if err := r.Body.Close(); err != nil {
 		panic(err)
 	}
-	id, err := strconv.Atoi(vars["id"])
+	id1, err := strconv.Atoi(vars["id1"])
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
-	emdc := repoGetEMDC(id)
-	if emdc == nil {
+	id2, err := strconv.Atoi(vars["id2"])
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+	emdc1 := repoGetEMDC(id1)
+	if emdc1 == nil {
 		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 		return
 	}
-	config, err := clientcmd.BuildConfigFromFlags("", emdc.confFile)
+	emdc2 := repoGetEMDC(id2)
+	if emdc2 == nil {
+		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+		return
+	}
+	config1, err := clientcmd.BuildConfigFromFlags("", emdc1.confFile)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	ic, err := versionedclient.NewForConfig(config)
+	ic, err := versionedclient.NewForConfig(config1)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
+	}
+	config2, err := clientcmd.BuildConfigFromFlags("", emdc2.confFile)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	clientset2, err := kubernetes.NewForConfig(config2)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	namespace := "istio-system"
+	pods, err := clientset2.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: "istio=ingressgateway"})
+	ingressIP := pods.Items[0].Status.HostIP
+	var ingressPort int32
+	s, err := clientset2.CoreV1().Services(namespace).Get(context.TODO(), "istio-ingressgateway", metav1.GetOptions{})
+	for _, p := range s.Spec.Ports {
+		if p.Port == 15443 {
+			ingressPort = p.NodePort
+			break
+		}
 	}
 	var svcEntry ServiceEntry
 	if err := json.Unmarshal(body, &svcEntry); err != nil {
@@ -217,33 +256,28 @@ func createNewServiceEntry(w http.ResponseWriter, r *http.Request) {
 	se.Spec.Hosts = []string{svcEntry.Host}
 	se.Spec.Location = 1   // MESH_INTERNAL
 	se.Spec.Resolution = 2 // DNS
-	portName := "foo"
+	portName := "braine"
 	se.Spec.Ports = []*v1b1.Port{{Number: svcEntry.PortNumber, Protocol: svcEntry.Protocol, Name: portName}}
 
-	// TODO get target IP and port from the emdc with id2
-	// clientset, err := kubernetes.NewForConfig(config)
-	// if err != nil {
-	// 	panic(err.Error())
-	// }
-	// namespace := "istio-system"
-	// pods, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: "istio=ingressgateway"})
-	// fmt.Printf("Found %d ingress gateways\n", len(pods.Items))
-	// fmt.Printf("Ingress gateway host IP: %s\n", pods.Items[0].Status.HostIP)
-	// s, err := clientset.CoreV1().Services(namespace).Get(context.TODO(), "istio-ingressgateway", metav1.GetOptions{})
-	// for _, p := range s.Spec.Ports {
-	// 	if p.Port == 15443 {
-	// 		fmt.Printf("Ingress gateway port: %d\n", p.NodePort)
-	// 	}
-	// }
-
-	se.Spec.Addresses = []string{"240.0.0.6"}
-	we := v1b1.WorkloadEntry{Address: "10.78.208.146", Ports: map[string]uint32{portName: 22684}}
+	ip := fmt.Sprintf("240.%d.%d.%d", rand.Intn(256), rand.Intn(256), rand.Intn(256))
+	se.Spec.Addresses = []string{ip}
+	we := v1b1.WorkloadEntry{Address: ingressIP, Ports: map[string]uint32{portName: uint32(ingressPort)}}
 	se.Spec.Endpoints = []*v1b1.WorkloadEntry{&we}
-	_, err = ic.NetworkingV1beta1().ServiceEntries(svcEntry.Namespace).Create(context.TODO(), &se, metav1.CreateOptions{})
+	ret, err := ic.NetworkingV1beta1().ServiceEntries(svcEntry.Namespace).Create(context.TODO(), &se, metav1.CreateOptions{})
 	if err != nil {
-		panic(err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
 	}
-	// todo return json representation
+	resp := ServiceEntry{
+		UUID:       string(ret.UID),
+		Host:       ret.Spec.Hosts[0],
+		Namespace:  ret.Namespace,
+		Name:       ret.Name,
+		PortNumber: ret.Spec.Ports[0].Number,
+		Protocol:   ret.Spec.Ports[0].Protocol,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
 }
 
 func returnSingleServiceEntry(w http.ResponseWriter, r *http.Request) {
@@ -272,7 +306,14 @@ func returnSingleServiceEntry(w http.ResponseWriter, r *http.Request) {
 	seList, err := ic.NetworkingV1beta1().ServiceEntries("").List(context.TODO(), metav1.ListOptions{})
 	for _, se := range seList.Items {
 		if string(se.UID) == uuid {
-			ret := ServiceEntry{UUID: uuid, Host: se.Spec.Hosts[0], Namespace: se.Namespace}
+			ret := ServiceEntry{
+				UUID:       uuid,
+				Host:       se.Spec.Hosts[0],
+				Namespace:  se.Namespace,
+				Name:       se.Name,
+				PortNumber: se.Spec.Ports[0].Number,
+				Protocol:   se.Spec.Ports[0].Protocol,
+			}
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(ret)
 			return
@@ -323,7 +364,7 @@ func main() {
 	myRouter.HandleFunc("/emdc/{id}", returnSingleEMDC)
 
 	myRouter.HandleFunc("/emdc/{id}/serviceentries", returnAllServiceEntries)
-	myRouter.HandleFunc("/emdc/{id}/serviceentry/create/{id2}", createNewServiceEntry).Methods("POST")
+	myRouter.HandleFunc("/emdc/{id1}/serviceentry/create/{id2}", createNewServiceEntry).Methods("POST")
 	myRouter.HandleFunc("/emdc/{id}/serviceentry/{uuid}", deleteServiceEntry).Methods("DELETE")
 	myRouter.HandleFunc("/emdc/{id}/serviceentry/{uuid}", returnSingleServiceEntry)
 	log.Fatal(http.ListenAndServe(":8090", myRouter))
