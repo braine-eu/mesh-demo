@@ -1,0 +1,41 @@
+@startuml
+title
+    Service mesh multi-edge solution 
+end title
+
+autonumber
+
+participant "L2 scheduler" as l2sch
+participant "EMDC1\nL1 scheduler" as emdc1
+participant "EMDC2\nL1 scheduler" as emdc2
+participant "Service Mesh\nconfigurator" as svcmesh
+participant "Pod A" as poda
+participant "Pod B" as podb
+
+group Initial configuration
+  l2sch -> svcmesh: Register EMDC1
+  l2sch -> svcmesh: Register EMDC2
+end
+
+group Service deployment
+l2sch -> emdc1: Deploy pod A
+note over emdc1
+  pod A needs to invoke
+  service B
+end note
+activate poda
+l2sch -> emdc2: Deploy pod B
+note over emdc2
+  pod B deploys service B
+end note
+activate podb
+l2sch -> svcmesh: Register "svcB.ns.global" on EMDC2
+end
+
+group Service operation
+poda -> podb: Call "svcB.ns.global"
+end
+
+deactivate poda
+deactivate podb
+@enduml
